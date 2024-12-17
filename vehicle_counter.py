@@ -67,7 +67,7 @@ with open("results.csv", "w", newline="") as csvfile:
 # Load the model
 model = YOLO("vehicle-counter-2-2.pt")
 
-# Open the video file (use video file or webcam)
+# Open the video file
 cap = cv2.VideoCapture('D:/all_machine_learning_trials/cv_2_0/testing_videos/5.mp4')
 
 
