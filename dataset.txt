@@ -1,0 +1,10 @@
+bicycle
+car
+e-trike
+house
+jeepney
+motorcycle
+multicab
+tricycle
+truck
+van
