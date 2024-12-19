@@ -3,15 +3,16 @@ import numpy as np
 from ultralytics import YOLO
 import cvzone
 import numpy as np
+import pytesseract
 import csv
-
+from PIL import Image
 
 # Variables
 area=[(550,17),(11,13),(11,488),(974,488),(974,83)]
 count=0
 bicycle_count = []
+bus_count = []
 car_count = []
-e_trike_count = []
 jeepney_count = []
 motorcycle_count = []
 multicab_count = []
@@ -38,14 +39,14 @@ def vehicle_counter(vehicle_class_list, vehicle_counter_list):
         if result>=0:
             cv2.rectangle(frame,(x1,y1),(x2,y2),(255,255,255),2)
             cvzone.putTextRect(
-                frame,f'ID: {track_id} {class_names[class_id]}',
-                (x1,y1),2,3,
-                colorT=(255, 255, 255), colorR=(0, 0, 0)
+                frame, f'ID: {track_id} {class_names[class_id]}',
+                (x1,y1), 2, 3,
+                colorT = (255, 255, 255), colorR = (0, 0, 0)
                 )
             cvzone.putTextRect(
-                frame,f'{confidence_format(conf)}',
-                (x1,y2),2,3,
-                colorT=(255, 255, 255), colorR=(0, 0, 0)
+                frame, f'{confidence_format(conf)}',
+                (x1, y2), 2 ,3,
+                colorT = (255, 255, 255), colorR = (0, 0, 0)
                 )
             if vehicle_counter_list.count(track_id)==0:
                 vehicle_counter_list.append(track_id)
@@ -60,20 +61,27 @@ with open("dataset.txt", "r") as f:
 
 # Set the csv file headers
 with open("results.csv", "w", newline="") as csvfile:
-    headernames = ["ID", "VEHICLE", "CONFIDENCE"]
+    headernames = ["ID", "VEHICLE", "CONFIDENCE", "OCR"]
     writer = csv.DictWriter(csvfile, fieldnames=headernames)
     writer.writeheader()
 
+with open("sequential_data.csv", "w", newline="") as csvfile:
+    headernames2 = ["FRAME", "DATE", "TIME", "BICYCLE", "BUS", "CAR", "JEEPNEY", "MOTORCYCLE", "MULTICAB", "TRICYCLE", "TRUCK", "VAN"]
+    writer = csv.DictWriter(csvfile, fieldnames=headernames2)
+    writer.writeheader()
+
 # Load the model
-model = YOLO("vehicle-counter-2-2.pt")
+model = YOLO("vehicle_counter-2-3.pt")
+
+pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
 
 # Open the video file
-cap = cv2.VideoCapture('D:/all_machine_learning_trials/cv_2_0/testing_videos/5.mp4')
+cap = cv2.VideoCapture('D:/all_machine_learning_trials/cv_2_0/testing_videos/6.mp4')
 
 
 
 
-
+index = 0
 while True:
     # Read a frame from the video
     ret, frame = cap.read()
@@ -84,11 +92,46 @@ while True:
     if count % 2 != 0:
         continue
 
+
     frame = cv2.resize(frame, (1020, 500))
+
+    # OCR of the date and time
+   
+
+    # save every 100th frame
+    if index % 60 == 0:
+        ocr_img_name = r'ocr_saved_img/frame' + str(index) + r'.png'
+        cropped_img_name = r'cropped_images/frame' + str(index) + r'.png'
+
+        print('Extracting frames...' + ocr_img_name)
+        cv2.imwrite(ocr_img_name, frame)
+
+        im = Image.open(ocr_img_name)
+        # Setting the points for cropped image
+        left = 750
+        top = 7
+        right = 1015
+        bottom = 35
+    
+        # Cropped image of above dimension
+        # (It will not change original image)
+        cropped_image = im.crop((left, top, right, bottom))
+        cropped_image.save(cropped_img_name)
+        print('Cropping frames...' + cropped_img_name)
+        # cv2.imwrite(cropped_img_name, cropped_image)
+    
+    
+
+    ocr_img = cv2.imread(cropped_img_name)
+    ocr = pytesseract.image_to_string(ocr_img)
+
     
     # Run YOLO tracking on the frame, persisting tracks between frames
-    results = model.track(frame, conf = .80, iou = .20, tracker = "bytetrack.yaml")
+    results = model.track(frame, iou = .70, tracker="bytetrack.yaml", persist = True)
     # results = model.track(frame, tracker="bytetrack.yaml")
+
+    
+   
    
     # Check if there are any boxes in the results
     if results[0].boxes is not None and results[0].boxes.id is not None:
@@ -105,54 +148,94 @@ while True:
             cy = int(y1+y2)//2
 
             
-            vehicle_class_list = ['bicycle', 'car', 'e-trike', 'jeepney', 'motorcycle', 'multicab', 'tricycle', 'truck', 'van']
-            vehicle_counter_list = [bicycle_count, car_count, e_trike_count, jeepney_count, motorcycle_count, multicab_count, tricycle_count, truck_count, van_count]
+            vehicle_class_list = ['Bicycle', 'Bus', 'Car', 'Jeepney', 'Motorcycle', 'Multicab', 'Tricycle', 'Truck', 'Van']
+            vehicle_counter_list = [bicycle_count, bus_count, car_count, jeepney_count, motorcycle_count, multicab_count, tricycle_count, truck_count, van_count]
+
+            bicycle_counter=len(bicycle_count)
+            bus_counter=len(bus_count)   
+            car_counter=len(car_count)  
+            jeepney_counter=len(jeepney_count)
+            motorcycle_counter=len(motorcycle_count) 
+            multicab_counter=len(multicab_count) 
+            tricycle_counter=len(tricycle_count)
+            truck_counter=len(truck_count)  
+            van_counter=len(van_count)   
+
 
             # Each Vehicle Counter
             for i in range(0, 9):
                 vehicle_counter(vehicle_class_list[i], vehicle_counter_list[i])
             
-                     
-            
+           
+
             with open("results.csv", "a", newline="") as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=headernames)
                 writer.writerow({
                     'ID': track_id,
                     'VEHICLE': c,
                     'CONFIDENCE': confidence_format(conf),
+                    'OCR': ocr,
                 }),
-                      
+            
+            split_date_time = ocr.split()
+            if len(split_date_time) is None:
+                date = time
+            elif len(split_date_time) != 2:
+                date, time = 'None', 'None'
+            else:
+                date =  split_date_time[0]
+                time =  split_date_time[1]
+           
+            with open("sequential_data.csv", "a", newline="") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=headernames2)
+                writer.writerow({
+                    'FRAME': index,
+                    'DATE': date,
+                    'TIME': time,
+                    'BICYCLE': bicycle_counter,
+                    'BUS': ocr,
+                    'CAR': ocr,
+                    'JEEPNEY': ocr,
+                    'MOTORCYCLE': ocr,
+                    'MULTICAB': ocr,
+                    'TRICYCLE': ocr,
+                    'TRUCK': ocr,
+                    'VAN': ocr,
+                }),
+
+                   
 
     cv2.polylines(frame,[np.array(area,np.int32)],True,(255,255,255),2) # vehicle counter area/box
     
-    bicycle_counter=len(bicycle_count)                  
+                      
     cvzone.putTextRect(frame,f'Bicycle: {bicycle_counter}',(845,60),1,2,colorR=(29, 66, 31))                  
    
-    car_counter=len(car_count)                  
+                   
+    cvzone.putTextRect(frame,f'E-trike: {bus_counter}',(845,140),1,2,colorR=(29, 66, 31))    
+
+                    
     cvzone.putTextRect(frame,f'Car: {car_counter}',(845,100),1,2,colorR=(29, 66, 31))                  
 
-    e_trike_counter=len(e_trike_count)                  
-    cvzone.putTextRect(frame,f'E-trike: {e_trike_counter}',(845,140),1,2,colorR=(29, 66, 31))                  
 
-    jeepney_counter=len(jeepney_count)                  
+                      
     cvzone.putTextRect(frame,f'Jeepney: {jeepney_counter}',(845,180),1,2,colorR=(29, 66, 31))                  
 
-    motorcycle_counter=len(motorcycle_count)                  
+                    
     cvzone.putTextRect(frame,f'Motorcycle: {motorcycle_counter}',(845,220),1,2,colorR=(29, 66, 31))                  
 
-    multicab_counter=len(multicab_count)                  
+                    
     cvzone.putTextRect(frame,f'Multicab: {multicab_counter}',(845,260),1,2,colorR=(29, 66, 31))                  
 
-    tricycle_counter=len(tricycle_count)                  
+                      
     cvzone.putTextRect(frame,f'Tricycle: {tricycle_counter}',(845,300),1,2,colorR=(29, 66, 31))                  
 
-    truck_counter=len(truck_count)                  
+                    
     cvzone.putTextRect(frame,f'Truck: {truck_counter}',(845,340),1,2,colorR=(29, 66, 31))                  
 
-    van_counter=len(van_count)                  
+                   
     cvzone.putTextRect(frame,f'Van: {van_counter}',(845,380),1,2,colorR=(29, 66, 31))                  
 
-
+    index = index + 1 
 
     # with open("results.csv", "w", newline="") as csvfile:
     #    headernames = ["ID", "BICYCLE", "CAR", "E-TRIKE", "JEEPNEY", "MOTORCYCLE", "MULTICAB", "TRICYCLE", "TRUCK", "VAN"]
@@ -188,9 +271,19 @@ with open("results.csv") as csvfile:
     print(columnNames)
 
 
-
-
 with open("results.csv") as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
-        print(row['ID']+" - "+row['VEHICLE']+" - "+row['CONFIDENCE'])
+        print(row['ID']+" - "+row['VEHICLE']+" - "+row['CONFIDENCE']+row['OCR'])
+
+
+with open("sequential_data.csv") as csvfile:
+    reader = csv.DictReader(csvfile)
+    columnNames2 = reader.fieldnames
+    print(columnNames2)
+
+
+with open("sequential_data.csv") as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        print(row['FRAME']+" - "+row['DATE']+" - "+row['TIME']+row['BICYCLE']+row['BUS']+row['CAR']+row['JEEPNEY']+row['MOTORCYCLE']+row['MULTICAB']+row['TRICYCLE']+row['TRUCK']+row['VAN'])
