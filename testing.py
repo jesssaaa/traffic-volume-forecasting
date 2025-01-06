@@ -8,13 +8,25 @@ import csv
 from PIL import Image
 from timeit import default_timer as timer
 import threading
+import datetime
+import time
 
+day_of_week = "None"
+congestion_status = "Light"
+density_stats = False
 # Variables
 area = [(475,2), (14,2), (14,312), (707,488), (974,488), (974,83)]
 count = 0
 frame_count = 0
 total_count = 0
-int_time_min = 0
+interval_count = 0
+total_count_5_min = 0
+total_counter_5_min = 0
+density_count = 0
+density_list = []
+vehicle_counter_list = []
+density_counter_list = []
+vehicle_interval_list = []
 bicycle_count = []
 bus_count = []
 car_count = []
@@ -66,11 +78,47 @@ def vehicle_counter(vehicle_class_list, vehicle_counter_list):
                 )
             if vehicle_counter_list.count(track_id)==0:
                 vehicle_counter_list.append(track_id)
+                
+def density_counter(vehicle_class_list, density_counter_list):
+    if vehicle_class_list in c:
+        result=cv2.pointPolygonTest(np.array(area,np.int32),((cx,cy)),False)
+        if result>=0:
+            if density_counter_list.count(track_id)==0:
+                density_counter_list.append(track_id)
 
-def ocr_task():
-            ocr_img = cv2.imread(cropped_img_name)
-            ocr = pytesseract.image_to_string(ocr_img)
-            return ocr
+def vehicle_interval_counter(vehicle_class_list, vehicle_interval_list, total_counter_5_min):
+    if vehicle_class_list in c:
+        result=cv2.pointPolygonTest(np.array(area,np.int32),((cx,cy)),False)
+        if result>=0:
+            if vehicle_interval_list.count(track_id)==0:
+                vehicle_interval_list.append(track_id)
+                total_counter_5_min += len(vehicle_interval_list)
+    return total_counter_5_min
+# def ocr_task():
+#             ocr_img = cv2.imread(cropped_img_name)
+#             ocr = pytesseract.image_to_string(ocr_img)
+#             return ocr
+
+def to_day_of_week(date):
+    format = '%Y-%m-%d'
+    date_str = datetime.datetime.strptime(date, format)
+
+    return date_str
+
+
+
+# checks if values of congestion list are all the same
+def congestion_checker(density_list):
+    return all(i == density_list[i] for i in density_list)
+
+
+def congestion_status_generator(interval_count, density_status):
+    interval_count += 1
+    global congestion_status
+    if interval_count <= 3 and density_status == True:
+        congestion_status = "Moderate"
+    if interval_count > 3 and density_status == True:
+        congestion_status = "Heavy"
 
 
 cv2.namedWindow('Vehicle_Counter')
@@ -82,237 +130,213 @@ with open("dataset.txt", "r") as f:
 
 # Set the csv file headers
 with open("results.csv", "w", newline="") as csvfile:
-    headernames = ["ID", "VEHICLE", "CONFIDENCE", "OCR"]
+    headernames = ["ID", "VEHICLE", "CONFIDENCE", "DATETIME", "DENSITY"]
     writer = csv.DictWriter(csvfile, fieldnames=headernames)
     writer.writeheader()
 
-with open("sequential_data4.csv", "w", newline="") as csvfile:
-    headernames2 = ["DATE", "HOUR", "MINUTE", "SECOND", "BICYCLE", "BUS", "CAR", "JEEPNEY", "MOTORCYCLE", "MULTICAB", "TRICYCLE", "TRUCK", "VAN", "TOTAL"]
-    writer = csv.DictWriter(csvfile, fieldnames=headernames2)
+
+with open("sequential_data.csv", "w", newline="") as csvfile:
+    headernames3 = ["DATE", "TIME", "DAY_OF_WEEK", "BICYCLE", "BUS", "CAR", "JEEPNEY", "MOTORCYCLE", "MULTICAB", "TRICYCLE", "TRUCK", "VAN", "DENSITY", "CONGENSTION_STATUS", "INTERVAL_COUNT", "TOTAL_COUNT"]
+    writer = csv.DictWriter(csvfile, fieldnames=headernames3)
     writer.writeheader()
 
 # Load the model
-model = YOLO("vehicle_counter-2-3.pt")
+model = YOLO("vehicle-counter-final.pt")
 
-pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
+# pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
 
 # Open the video file
-cap = cv2.VideoCapture('D:/COLLEGE/4TH YEAR/THESIS/DATASETS/RAW VIDEO DATASET 1 HOUR INTERVAL/NOVEMBER 17/6 AM/2024-11-17_6-am.mp4')
+cap = cv2.VideoCapture('D:/0106.mp4')
 # cap = cv2.VideoCapture('D:/all_machine_learning_trials/cv_2_0/testing_videos/6.mp4')
+# heavy traffic
+# cap = cv2.VideoCapture('C:/Users/Toink/Downloads/FREE STOCK FOOTAGE - Heavy traffic.mp4')
+
 
 
 # Get initial time for FPS calculation
 start_time = timer()
-
-
 index = 0
+q = 0
 
-if __name__ == "__main__":
-    while True:
-        # Read a frame from the video
-        ret, frame = cap.read()
-        if not ret:
-            break
 
-        count += 1
-        if count % 2 != 0:
+while True:
+    # Read a frame from the video
+    ret, frame = cap.read()
+    if not ret:
+        break
+    count += 1
+    if count % 2 != 0:
             continue
-
-
-        frame = cv2.resize(frame, (1020, 500))
-
-        # OCR of the date and time
-    
-        
-        # save every 100th frame
-        if index % 60 == 0:
-            ocr_img_name = r'ocr_saved_img/frame' + str(index) + r'.png'
-            cropped_img_name = r'cropped_images/frame' + str(index) + r'.png'
-
-            print('Extracting frames...' + ocr_img_name)
-            cv2.imwrite(ocr_img_name, frame)
-
-            im = Image.open(ocr_img_name)
-            # imgg = im.convert('LA')
-            # imgg.save(ocr_img_name)
-            # Setting the points for cropped image
-            left = 752
-            top = 7
-            right = 1015
-            bottom = 35
-        
-            # Cropped image of above dimension
-            # (It will not change original image)
-            cropped_image = im.crop((left, top, right, bottom))
-            cropped_image.save(cropped_img_name)
-            print('Cropping frames...' + cropped_img_name)
-            # cv2.imwrite(cropped_img_name, cropped_image)
         
 
+    # DATE AND TIME STAMP
+    get_datetime = datetime.datetime.now()
+    date = get_datetime.strftime("%Y-%m-%d")
+    day_of_week = get_datetime.strftime("%A")
+    time_hour = get_datetime.strftime("%H")
+    time_min = get_datetime.strftime("%M")
+    time_sec = get_datetime.strftime("%S")
+
+       
         
         
-        
-        
-        
+    frame = cv2.resize(frame, (1020, 500))
         # Run YOLO tracking on the frame, persisting tracks between frames
-        results = model.track(frame, iou = 0.5, tracker="botsort.yaml", persist = True)
-        # results = model.track(frame, tracker="bytetrack.yaml")
-
-
-        
+    results = model.track(frame, conf = 0.90, iou = 0.5, persist = True, tracker="bytetrack.yaml")
+    # results = model.track(frame, tracker="bytetrack.yaml")
 
     
-        # Check if there are any boxes in the results
-        if results[0].boxes is not None and results[0].boxes.id is not None:
-            # Get the boxes (x, y, w, h), class IDs, track IDs, and confidences
-            boxes = results[0].boxes.xyxy.int().cpu().tolist()  # Bounding boxes
-            class_ids = results[0].boxes.cls.int().cpu().tolist()  # Class IDs
-            track_ids = results[0].boxes.id.int().cpu().tolist()  # Track IDs
-            confidences = results[0].boxes.conf.cpu().tolist()  # Confidence score
+    # Check if there are any boxes in the results
+    if results[0].boxes is not None and results[0].boxes.id is not None:
+        # Get the boxes (x, y, w, h), class IDs, track IDs, and confidences
+        boxes = results[0].boxes.xyxy.int().cpu().tolist()  # Bounding boxes
+        class_ids = results[0].boxes.cls.int().cpu().tolist()  # Class IDs
+        track_ids = results[0].boxes.id.int().cpu().tolist()  # Track IDs
+        confidences = results[0].boxes.conf.cpu().tolist()  # Confidence score
 
-            ocr = ocr_task()
+            
         
-            for box, class_id, track_id, conf in zip(boxes, class_ids, track_ids, confidences):
-                c = class_names[class_id]
-                x1, y1, x2, y2 = box
-                cx = int(x1+x2)//2
-                cy = int(y1+y2)//2
+        for box, class_id, track_id, conf in zip(boxes, class_ids, track_ids, confidences):
+            c = class_names[class_id]
+            x1, y1, x2, y2 = box
+            cx = int(x1+x2)//2
+            cy = int(y1+y2)//2
 
-                
-                vehicle_class_list = ['Bicycle', 'Bus', 'Car', 'Jeepney', 'Motorcycle', 'Multicab', 'Tricycle', 'Truck', 'Van']
-                vehicle_counter_list = [bicycle_count, bus_count, car_count, jeepney_count, motorcycle_count, multicab_count, tricycle_count, truck_count, van_count]
 
-                bicycle_counter=len(bicycle_count)
-                bus_counter=len(bus_count)   
-                car_counter=len(car_count)  
-                jeepney_counter=len(jeepney_count)
-                motorcycle_counter=len(motorcycle_count) 
-                multicab_counter=len(multicab_count) 
-                tricycle_counter=len(tricycle_count)
-                truck_counter=len(truck_count)  
-                van_counter=len(van_count)   
-
-                total_count = bicycle_counter + bus_counter + car_counter + jeepney_counter + motorcycle_counter + multicab_counter + tricycle_counter + truck_counter + van_counter
-
+            vehicle_class_list = ['BICYCLE', 'BUS', 'CAR', 'JEEP', 'MOTORCYCLE', 'MULTICAB', 'TRICYCLE', 'TRUCK', 'VAN']
+            vehicle_counter_list = [bicycle_count, bus_count, car_count, jeepney_count, motorcycle_count, multicab_count, tricycle_count, truck_count, van_count]
 
                 # Each Vehicle Counter
-                for i in range(0, 9):
-                    # vehicle_counter(vehicle_class_list[i], vehicle_counter_list[i])
-                    vehicle_counter(vehicle_class_list[i], vehicle_counter_list[i])
+            for i in range(0, 9):
+                # vehicle_counter(vehicle_class_list[i], vehicle_counter_list[i])
+                vehicle_counter(vehicle_class_list[i], vehicle_counter_list[i])
+                density_counter(vehicle_class_list[i], density_counter_list)
+                total_counter_5_min = vehicle_interval_counter(vehicle_class_list[i], vehicle_interval_list, total_counter_5_min)
+
                     
+
+            bicycle_counter=len(bicycle_count)
+            bus_counter=len(bus_count)   
+            car_counter=len(car_count)  
+            jeepney_counter=len(jeepney_count)
+            motorcycle_counter=len(motorcycle_count) 
+            multicab_counter=len(multicab_count) 
+            tricycle_counter=len(tricycle_count)
+            truck_counter=len(truck_count)  
+            van_counter=len(van_count)   
+
+            total_count = bicycle_counter + bus_counter + car_counter + jeepney_counter + motorcycle_counter + multicab_counter + tricycle_counter + truck_counter + van_counter
+            density_count = len(density_counter_list)
+                
+                        
+                        
+
+            with open("results.csv", "a", newline="") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=headernames)
+                writer.writerow({
+                    'ID': f'{track_id} >> {index}',
+                    'VEHICLE': c,
+                    'CONFIDENCE': confidence_format(conf),
+                    'DENSITY': density_count
+                }),
+        
+
+        
+                    
+    # if int(time_min) % 15 == 0 and int(time_sec) == 0:  # 15 min interval     
+    if int(time_min) % 5 == 0 and int(time_sec) == 0: # 5 min interval       
+        if density_count > 3:
+            density_list.append(density_count)
+            density_stats = congestion_checker(density_list)       
+
+            congestion_status_generator(interval_count, density_stats)
+
+        total_count_5_min += total_counter_5_min
+
+        with open("sequential_data.csv", "a", newline="") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=headernames3)
+            writer.writerow({
+                'DATE': date,
+                'TIME': f"{time_hour}:{time_min}:{time_sec}",
+                'DAY_OF_WEEK': day_of_week,
+                'BICYCLE': bicycle_counter,
+                'BUS': bus_counter,
+                'CAR': car_count,
+                'JEEPNEY': jeepney_counter,
+                'MOTORCYCLE': motorcycle_counter,
+                'MULTICAB': multicab_counter,
+                'TRICYCLE': tricycle_counter,
+                'TRUCK': truck_counter,
+                'VAN': van_counter,
+                'DENSITY': density_count,
+                'CONGENSTION_STATUS': congestion_status,
+                'INTERVAL_COUNT': total_count,
+                'TOTAL_COUNT': total_count_5_min
+            }),
+
+         
+        for i in range(0, 9):
+            # vehicle_counter(vehicle_class_list[i], vehicle_counter_list[i])
+            vehicle_counter_list[i].clear()
             
-
+        vehicle_interval_list.clear()
+        total_count_5_min = 0  
+        total_count = 0   
                 
 
-                # Date and Time Format to prevent error
-                split_date_time = ocr.split()
-
-                if len(split_date_time) is None:
-                    date = time
-                elif len(split_date_time) != 2:
-                    date = time = 'None'
-                else:
-                    date =  split_date_time[0]
-                    time =  split_date_time[1]
-
-                # Split time into format of hour, minutes, and seconds
-                split_time = time.split(":", 3)
-
-                if len(split_time) is None:
-                    date = time
-                elif len(split_time) != 3:
-                    time_hour = time_min = time_sec = 'None'
-                else:
-                    time_hour = split_time[0]
-                    time_min = split_time[1]
-                    time_sec = split_time[2]
-                
-                if time_min != 'None':
-                    time_min = time_min.strip('°')
-                    int_time_hour = int(time_hour)
-                    int_time_min = int(time_min)
-                    int_time_sec = int(time_sec)
-
-                    if int_time_min % 15 == 0:    
-                        with open("sequential_data4.csv", "a", newline="") as csvfile:
-                        
-                            writer = csv.DictWriter(csvfile, fieldnames=headernames2)
-
-                            writer.writerow({
-                                'DATE': date,
-                                'HOUR': int_time_hour,
-                                'MINUTE': int_time_min,
-                                'SECOND': int_time_sec,
-                                'BICYCLE': bicycle_counter,
-                                'BUS': bus_counter,
-                                'CAR': car_counter,
-                                'JEEPNEY': jeepney_counter,
-                                'MOTORCYCLE': motorcycle_counter,
-                                'MULTICAB': multicab_counter,
-                                'TRICYCLE': tricycle_counter,
-                                'TRUCK': truck_counter,
-                                'VAN': van_counter,
-                                'TOTAL': total_count
-                            }),
-                        
-                        
-
-                        with open("results.csv", "a", newline="") as csvfile:
-                            writer = csv.DictWriter(csvfile, fieldnames=headernames)
-                            writer.writerow({
-                                'ID': track_id,
-                                'VEHICLE': c,
-                                'CONFIDENCE': confidence_format(conf),
-                                'OCR': ocr,
-                            }),
-                            
+            
+        
+        
                 
         
-        cv2.polylines(frame, [np.array(area,np.int32)], True,(0, 255, 0), 2) # vehicle counter area/box
+    cv2.polylines(frame, [np.array(area,np.int32)], True,(0, 255, 0), 2) # vehicle counter area/box
         
                         
-        cvzone.putTextRect(frame,f'Bicycle: {bicycle_counter}',(845,60),1,2,colorR=(29, 66, 31))                  
+    cvzone.putTextRect(frame,f'Bicycle: {bicycle_counter}',(845,60),1,2,colorR=(29, 66, 31))                  
     
                     
-        cvzone.putTextRect(frame,f'Bus: {bus_counter}',(845,100),1,2,colorR=(29, 66, 31))    
+    cvzone.putTextRect(frame,f'Bus: {bus_counter}',(845,100),1,2,colorR=(29, 66, 31))    
 
                         
-        cvzone.putTextRect(frame,f'Car: {car_counter}',(845,140),1,2,colorR=(29, 66, 31))                  
+    cvzone.putTextRect(frame,f'Car: {car_counter}',(845,140),1,2,colorR=(29, 66, 31))                  
 
                         
-        cvzone.putTextRect(frame,f'Jeepney: {jeepney_counter}',(845,180),1,2,colorR=(29, 66, 31))                  
+    cvzone.putTextRect(frame,f'Jeepney: {jeepney_counter}',(845,180),1,2,colorR=(29, 66, 31))                  
 
                         
-        cvzone.putTextRect(frame,f'Motorcycle: {motorcycle_counter}',(845,220),1,2,colorR=(29, 66, 31))                  
+    cvzone.putTextRect(frame,f'Motorcycle: {motorcycle_counter}',(845,220),1,2,colorR=(29, 66, 31))                  
 
                         
-        cvzone.putTextRect(frame,f'Multicab: {multicab_counter}',(845,260),1,2,colorR=(29, 66, 31))                  
-
-                        
-        cvzone.putTextRect(frame,f'Tricycle: {tricycle_counter}',(845,300),1,2,colorR=(29, 66, 31))                  
-
-                        
-        cvzone.putTextRect(frame,f'Truck: {truck_counter}',(845,340),1,2,colorR=(29, 66, 31))                  
-                    
-        cvzone.putTextRect(frame,f'Van: {van_counter}',(845,380),1,2,colorR=(29, 66, 31))                  
+    cvzone.putTextRect(frame,f'Multicab: {multicab_counter}',(845,260),1,2,colorR=(29, 66, 31))                  
         
-        cvzone.putTextRect(frame,f'Total Count: {total_count}',(845,420),1,2,colorR=(29, 69, 31))                  
-        cvzone.putTextRect(frame,f'Total Count: {int_time_min}',(845,440),1,2,colorR=(29, 69, 31))                  
+                        
+    cvzone.putTextRect(frame,f'Tricycle: {tricycle_counter}',(845,300),1,2,colorR=(29, 66, 31))                  
 
+                        
+    cvzone.putTextRect(frame,f'Truck: {truck_counter}',(845,340),1,2,colorR=(29, 66, 31))                  
+                    
+    cvzone.putTextRect(frame,f'Van: {van_counter}',(845,380),1,2,colorR=(29, 66, 31))                  
+        
+    cvzone.putTextRect(frame,f'Total Count: {total_count}',(845,420),1,2,colorR=(29, 69, 31))                  
+        
+    # Reset values every interval
+        
+    density_counter_list.clear()
+    density_count = len(density_counter_list)
+    index += 1
 
-        index = index + 1
+    # Calculate and display FPS
+    frame_count += 1
+    end_time = timer()
+    elapsed_time = end_time - start_time
+    fps = frame_count / elapsed_time
+    cv2.putText(frame, f'FPS: {fps:.2f}', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    time.sleep(0.014)
 
-        # Calculate and display FPS
-        frame_count += 1
-        end_time = timer()
-        elapsed_time = end_time - start_time
-        fps = frame_count / elapsed_time
-        cv2.putText(frame, f'FPS: {fps:.2f}', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-        # Displays vehicle counter window
-        cv2.imshow("Vehicle_Counter", frame)
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
+    # Displays vehicle counter window
+    cv2.imshow("Vehicle_Counter", frame)
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        break
 
 # Release the video capture object and close the display window
 cap.release()
@@ -320,26 +344,26 @@ cv2.destroyAllWindows()
 
 
 
-with open("results.csv") as csvfile:
-    reader = csv.DictReader(csvfile)
-    columnNames = reader.fieldnames
-    print(columnNames)
+# with open("results.csv") as csvfile:
+#     reader = csv.DictReader(csvfile)
+#     columnNames = reader.fieldnames
+#     print(columnNames)
 
 
-with open("results.csv") as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        print(row['ID']+" - "+row['VEHICLE']+" - "+row['CONFIDENCE']+row['OCR'])
+# with open("results.csv") as csvfile:
+#     reader = csv.DictReader(csvfile)
+#     for row in reader:
+#         print(row['ID']+" - "+row['VEHICLE']+" - "+row['CONFIDENCE']+" - "+row['OCR']+" - "+row['DENSITY'])
 
 
-with open("sequential_data4.csv") as csvfile:
-    reader = csv.DictReader(csvfile)
-    columnNames2 = reader.fieldnames
-    print(columnNames2)
+# with open("sequential_data4.csv") as csvfile:
+#     reader = csv.DictReader(csvfile)
+#     columnNames2 = reader.fieldnames
+#     print(columnNames2)
 
 
-with open("sequential_data4.csv") as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        print(row['DATE']+" - "+row['HOUR']+" - "+row['MINUTE']+" - "+row['SECOND']+" - "+row['BICYCLE']+" - "+row['BUS']+" - "+row['CAR']+" - "+row['JEEPNEY']+" - "+row['MOTORCYCLE']+" - "+row['MULTICAB']+" - "+row['TRICYCLE']+" - "+row['TRUCK']+" - "+row['VAN']+" - "+row['TOTAL'])
-        
+# with open("sequential_data4.csv") as csvfile:
+#     reader = csv.DictReader(csvfile)
+#     for row in reader:
+#         print(row['DATE']+" - "+row['HOUR']+" - "+row['MINUTE']+" - "+row['SECOND']+" - "+row['BICYCLE']+" - "+row['BUS']+" - "+row['CAR']+" - "+row['JEEPNEY']+" - "+row['MOTORCYCLE']+" - "+row['MULTICAB']+" - "+row['TRICYCLE']+" - "+row['TRUCK']+" - "+row['VAN']+" - "+row['TOTAL'])
+
