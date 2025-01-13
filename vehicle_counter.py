@@ -3,9 +3,6 @@ import numpy as np
 from ultralytics import YOLO
 import cvzone
 import numpy as np
-import pytesseract
-import csv
-from PIL import Image
 import datetime
 import time
 
