@@ -11,7 +11,7 @@ from yt_dlp import YoutubeDL # type: ignore
 
 
 # get live video from youtube
-url = "https://www.youtube.com/watch?v=nSaf6rfEKcQ"  #change url with specific youtube cctv video url                   
+url = "https://www.youtube.com/watch?v=2_1xD9ipDaA&list=PLKCLZTraWkYMNnnP1aBSctDVJehBQxgCd"  #change url with specific youtube cctv video url                   
 
 ydl_opts = {
     'format': 'best[ext=mp4]',  # Get best mp4 format
