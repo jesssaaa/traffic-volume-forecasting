@@ -5,9 +5,27 @@ import cvzone
 import numpy as np
 import datetime
 import time
+import csv
+
+from yt_dlp import YoutubeDL # type: ignore
+
+url = "https://www.youtube.com/watch?v=nSaf6rfEKcQ"                     
+
+ydl_opts = {
+    'format': 'best[ext=mp4]',  # Get best mp4 format
+    'noplaylist': True
+}
+
+with YoutubeDL(ydl_opts) as ydl:
+    info_dict = ydl.extract_info(url, download=False)
+    video_url = info_dict.get("url")  # Get direct streaming URL
+    print("Streaming URL:", video_url)
+
+
+
 
 # Variables
-area = [(475,2), (14,2), (14,312), (707,488), (974,488), (974,83)]
+area = [(475,2), (14,2), (15,488), (707,488), (974,488), (974,83)]
 count = 0
 frame_count = 0
 total_count = 0
@@ -72,12 +90,12 @@ with open("dataset.txt", "r") as f:
     class_names = f.read().splitlines()
 
 # Set the csv file headers
-with open("results.csv", "w", newline="") as csvfile:
+with open("testresults.csv", "w", newline="") as csvfile:
     headernames = ["ID", "VEHICLE", "CONFIDENCE"]
     writer = csv.DictWriter(csvfile, fieldnames=headernames)
     writer.writeheader()
 
-with open("sequential_data4.csv", "w", newline="") as csvfile:
+with open("test_sequential_data.csv", "w", newline="") as csvfile:
     headernames2 = ["DATE", "TIME", "BICYCLE", "BUS", "CAR", "JEEPNEY", "MOTORCYCLE", "MULTICAB", "TRICYCLE", "TRUCK", "VAN", "TOTAL"]
     writer = csv.DictWriter(csvfile, fieldnames=headernames2)
     writer.writeheader()
@@ -86,8 +104,10 @@ with open("sequential_data4.csv", "w", newline="") as csvfile:
 model = YOLO("vehicle-detection-final.pt")
 
 
-# Open the video file
-cap = cv2.VideoCapture('D:/0106.mp4')
+
+
+cap = cv2.VideoCapture(video_url)
+# cap = cv2.VideoCapture("D:/COLLEGE/4TH YEAR/THESIS/DATASETS/RAW VIDEO DATASET 1 HOUR INTERVAL/NOVEMBER 17/7 AM/2024-11-17_7am.mp4")
 
 
 
@@ -115,7 +135,7 @@ while True:
 
     
     # Run YOLO tracking on the frame, persisting tracks between frames
-    results = model.track(frame, conf=.85, iou = .20, tracker="bytetrack.yaml", persist = True)
+    results = model.track(frame, conf=.80, iou = .20, tracker="bytetrack.yaml", persist = True)
     # results = model.track(frame, tracker="bytetrack.yaml")
 
 
@@ -168,7 +188,8 @@ while True:
                     'CONFIDENCE': confidence_format(conf),
                 }),
 
-    if int(time_min) % 5 == 0 and int(time_sec) == 0:        
+    # if int(time_min) % 0 == 0 and int(time_sec) == 0:        
+    if int(time_sec) % 1 == 0:        
         with open("sequential_data4.csv", "a", newline="") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=headernames2)
             writer.writerow({
