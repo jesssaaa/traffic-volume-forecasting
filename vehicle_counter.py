@@ -9,7 +9,9 @@ import csv
 
 from yt_dlp import YoutubeDL # type: ignore
 
-url = "https://www.youtube.com/watch?v=nSaf6rfEKcQ"                     
+
+# get live video from youtube
+url = "https://www.youtube.com/watch?v=nSaf6rfEKcQ"  #change url with specific youtube cctv video url                   
 
 ydl_opts = {
     'format': 'best[ext=mp4]',  # Get best mp4 format
@@ -106,7 +108,8 @@ model = YOLO("vehicle-detection-final.pt")
 
 
 
-cap = cv2.VideoCapture(video_url)
+cap = cv2.VideoCapture(video_url) # live footage url
+# below is local video file path
 # cap = cv2.VideoCapture("D:/COLLEGE/4TH YEAR/THESIS/DATASETS/RAW VIDEO DATASET 1 HOUR INTERVAL/NOVEMBER 17/7 AM/2024-11-17_7am.mp4")
 
 
